@@ -1,11 +1,19 @@
 # 1. Таблицы
+Во многих случаях используются одни и те же сокращения, они будут опущены.
+```javascript
+// Сокращенное обращение к таблице
+const tableId = 'table-' + w.general.renderTo;
+const table = document.getElementById(tableId);
+const $table = $(table);
+
+// Цвета для выделения ячеек
+const warningColor = "lightcoral"; 
+const positiveColor = "lightgreen";
+
+```
 
 ## 1.1. Выравнивание по центру заголовка для произвольного количества столбцов
 ```javascript
-// Переменные для удобства обращения и сокращения кода
-const tableId = 'table-' + w.general.renderTo;
-const $table = $(document.getElementById(tableId));
-
 // Массив ТОЧНЫХ названий заголовков столбцов для центрирования
 const headersToCenter = [
     "Время на согласование, дней",
@@ -42,10 +50,6 @@ headersToCenter.forEach(headerText => {
 ```
 ## 1.2. Форматирование даты для произвольного количества столбцов
 ```javascript
-// Переменные для удобства обращения и сокращения кода
-const tableId = 'table-' + w.general.renderTo;
-const $table = $(document.getElementById(tableId));
-
 // Массив ТОЧНЫХ названий заголовков столбцов с датами для форматирования
 const headersToDateFormat = [
     "Дата создания документа",
@@ -99,10 +103,6 @@ headersToDateFormat.forEach(headerText => {
 const actualTimeHeaderText = "Время на согласование, дней";
 const averageTimeHeaderText = "Среднее время согласования данного документа, дней";
 
-const tableId = 'table-' + w.general.renderTo;
-const table = document.getElementById(tableId);
-const $table = $(table);
-
 // Создаем карту (Map) для быстрого поиска индекса по названию заголовка в формате:
 // headerIndexMap = {
 //      headerText1: index1,
@@ -120,6 +120,7 @@ $table.find('thead th').each(function (index, th) {
 const actualTimeColIndex = headerIndexMap.get(actualTimeHeaderText);
 const averageTimeColIndex = headerIndexMap.get(averageTimeHeaderText);
 
+
 // Проверяем, найдены ли оба столбца
 if (actualTimeColIndex !== undefined && averageTimeColIndex !== undefined) {
     $table.find('tbody tr').each(function (rowIndex, tr) {
@@ -136,9 +137,9 @@ if (actualTimeColIndex !== undefined && averageTimeColIndex !== undefined) {
             actualTimeCell.css('background-color', '');
             if (!isNaN(actualValue) && !isNaN(averageValue)) {
                 if (actualValue < averageValue) {
-                    actualTimeCell.css('background-color', 'lightgreen'); // Зеленый
+                    actualTimeCell.css('background-color', positiveColor); // Зеленый
                 } else if (actualValue > averageValue) {
-                    actualTimeCell.css('background-color', 'lightcoral'); // Красный
+                    actualTimeCell.css('background-color', warningColor); 
                 }
             }
         }
@@ -148,8 +149,6 @@ if (actualTimeColIndex !== undefined && averageTimeColIndex !== undefined) {
 
 ## 1.4 Окрашивание ячеек в зависимости от значения в другом столбце (сравнение двух строк)
 ```javascript
-const warningColor = "lightcoral";
-
 $table.find('tbody tr').each(function (rowIndex, tr) {
     const $row = $(tr);
     const $cells = $row.children('td'); // Все ячейки строки
@@ -162,7 +161,6 @@ $table.find('tbody tr').each(function (rowIndex, tr) {
             $cells.not($lastCell).each(function () {
                 const $currentItem = $(this);
                 const currentCellText = $currentItem.text().trim();
-                // Сравниваем текст текущей ячейки с текстом последней
                 if (currentCellText === fioText) {
                     $currentItem.css('background-color', warningColor);
                 }
@@ -179,9 +177,6 @@ const headerNameWithIndex = new Map([
     [3, 'ФИО согласованта']
     // Добавьте сюда другие пары [номер столбца, новое_имя]
 ]);
-// Создаем переменную с таблицей для удобства работы
-const table = document.getElementById('table-' + w.general.renderTo);
-const $table = $(table);
 
 for (const [key, value] of headerNameWithIndex) {
     const headerSelector = `thead tr th:nth-child(${key})`;
@@ -190,4 +185,62 @@ for (const [key, value] of headerNameWithIndex) {
         headerCell.textContent = value;
     }
 }
+```
+## 1.6 Объединение повторяющихся ячеек в одну ячейку
+```javascript
+const columnHeadersToMerge = [
+    "Дата создания документа",
+    "Среднее время согласования данного документа, дней",
+    // Другие названия заголовков
+];
+
+const targetColumnIndices = [];
+columnHeadersToMerge.forEach(header => {
+    if (headerIndexMap.has(header)) {
+        targetColumnIndices.push(headerIndexMap.get(header));
+    }
+});
+
+if (targetColumnIndices.length > 0) {
+    const mergeStateMap = new Map();
+    targetColumnIndices.forEach(colIndex => {
+        mergeStateMap.set(colIndex, {
+            previousValue: null,
+            anchorCell: null,
+            rowspanCount: 1
+        });
+    });
+
+    const $rows = $table.find('tbody tr');
+    $rows.each(function (rowIndex) {
+        const $currentRow = $(this);
+        targetColumnIndices.forEach(colIndex => {
+            const state = mergeStateMap.get(colIndex);
+            if (!state) return;
+            const $currentCell = $currentRow.children('td').eq(colIndex);
+            if ($currentCell.length === 0) {
+                state.previousValue = `__CELL_NOT_FOUND_${rowIndex}_${colIndex}__`;
+                state.anchorCell = null;
+                state.rowspanCount = 1;
+                return;
+            }
+            const currentValue = $currentCell.text().trim();
+            if (currentValue === state.previousValue && currentValue !== "") {
+                state.rowspanCount++;
+                $currentCell.hide();
+                if (state.anchorCell) {
+                    state.anchorCell.attr('rowspan', state.rowspanCount);
+                    if (state.rowspanCount === 2) { // Стилизуем при первом объединении
+                        state.anchorCell.css({'vertical-align': 'middle'});
+                    }
+                }
+            } else {
+                state.rowspanCount = 1;
+                state.anchorCell = $currentCell;
+                state.previousValue = currentValue;
+                $currentCell.show().attr('rowspan', 1).css({'vertical-align': ''});
+            }
+        });
+    });
+} 
 ```
