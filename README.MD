@@ -16,10 +16,8 @@ const positiveColor = "lightgreen";
 ```javascript
 // Массив ТОЧНЫХ названий заголовков столбцов для центрирования
 const headersToCenter = [
-    "Время на согласование, дней",
-    "Среднее время согласования данного документа, дней",
-    "Дата создания документа",          
-    "Дата назначения на согласованта",
+    "Имя сотрудника",
+    "Название объекта",
     // Добавьте еще столбцы при необходимости
 ];
 
@@ -52,10 +50,9 @@ headersToCenter.forEach(headerText => {
 ```javascript
 // Массив ТОЧНЫХ названий заголовков столбцов с датами для форматирования
 const headersToDateFormat = [
-    "Дата создания документа",
-    "Дата назначения на согласованта",
+    "Дата увольнения сотрудника",
+    "Дата начала строительства объекта",
     // Добавьте еще столбцы при необходимости
-    
 ];
 
 // Создаем карту (Map) для быстрого поиска индекса по названию заголовка в формате:
@@ -100,8 +97,8 @@ headersToDateFormat.forEach(headerText => {
 ## 1.3 Окрашивание ячеек в зависимости от значения в другом столбце (сравнение двух чисел)
 ```javascript
 // Названия заголовков, для которых делаем окрашивание
-const actualTimeHeaderText = "Время на согласование, дней";
-const averageTimeHeaderText = "Среднее время согласования данного документа, дней";
+const actualTimeHeaderText = "Время исполнения";
+const averageTimeHeaderText = "Среднее время исполнения задания";
 
 // Создаем карту (Map) для быстрого поиска индекса по названию заголовка в формате:
 // headerIndexMap = {
@@ -139,7 +136,7 @@ if (actualTimeColIndex !== undefined && averageTimeColIndex !== undefined) {
                 if (actualValue < averageValue) {
                     actualTimeCell.css('background-color', positiveColor); // Зеленый
                 } else if (actualValue > averageValue) {
-                    actualTimeCell.css('background-color', warningColor); 
+                    actualTimeCell.css('background-color', warningColor); // Красный
                 }
             }
         }
@@ -154,14 +151,14 @@ $table.find('tbody tr').each(function (rowIndex, tr) {
     const $cells = $row.children('td'); // Все ячейки строки
     const $lastCell = $cells.last();   // Последняя ячейка
     if ($lastCell.length > 0) {
-        const fioText = $lastCell.text().trim();
+        const drugoiStolbecText = $lastCell.text().trim();
         // Проверяем, что в последней ячейке есть текст
-        if (fioText) {
+        if (drugoiStolbecText) {
             // Проходим по всем ячейкам КРОМЕ последней
             $cells.not($lastCell).each(function () {
                 const $currentItem = $(this);
                 const currentCellText = $currentItem.text().trim();
-                if (currentCellText === fioText) {
+                if (currentCellText === drugoiStolbecText) {
                     $currentItem.css('background-color', warningColor);
                 }
             });
@@ -173,8 +170,8 @@ $table.find('tbody tr').each(function (rowIndex, tr) {
 ```javascript
 const headerNameWithIndex = new Map([
     [1, 'Номер документа'],
-    [2, 'Краткое содержание'],
-    [3, 'ФИО согласованта']
+    [2, 'Содержание'],
+    [3, 'ФИО сотрудника']
     // Добавьте сюда другие пары [номер столбца, новое_имя]
 ]);
 
@@ -189,8 +186,7 @@ for (const [key, value] of headerNameWithIndex) {
 ## 1.6 Объединение повторяющихся ячеек в одну ячейку
 ```javascript
 const columnHeadersToMerge = [
-    "Дата создания документа",
-    "Среднее время согласования данного документа, дней",
+    "Дата начала кампании",
     // Другие названия заголовков
 ];
 
@@ -243,4 +239,61 @@ if (targetColumnIndices.length > 0) {
         });
     });
 } 
+```
+## 1.7 Добавление стрелки, указывающей положительную или отрицательную динамику в ячейку, в зависимости от значения
+```javascript
+const headerIndexMap = new Map();
+$(table).find('thead th').each(function(index, th) {
+    const headerText = $(th).text().trim();
+    headerIndexMap.set(headerText, index);
+});
+
+const actualTimeHeaderText = "Время выполнение задачи";
+const averageTimeHeaderText = "Среднее время выполнения задачи";
+
+const actualTimeColIndex = headerIndexMap.get(actualTimeHeaderText);
+const averageTimeColIndex = headerIndexMap.get(averageTimeHeaderText);
+
+if (actualTimeColIndex !== undefined && averageTimeColIndex !== undefined) {
+    $table.find('tbody tr').each(function (rowIndex, tr) {
+        const $row = $(tr);
+        const actualTimeCell = $row.children('td').eq(actualTimeColIndex);
+        const averageTimeCell = $row.children('td').eq(averageTimeColIndex);
+        if (actualTimeCell.length > 0 && averageTimeCell.length > 0) {
+            actualTimeCell.find('span.time-indicator').remove();
+            const actualTimeText = actualTimeCell.text().trim().replace(',', '.');
+            const averageTimeText = averageTimeCell.text().trim().replace(',', '.');
+            const actualValue = parseFloat(actualTimeText);
+            const averageValue = parseFloat(averageTimeText);
+            actualTimeCell.css('background-color', '');
+            if (!isNaN(actualValue) && !isNaN(averageValue)) {
+                let arrowChar = '';
+                let arrowColor = '';
+                let indicatorClass = '';
+                if (actualValue <= averageValue) {
+                    arrowChar = '▼'; // Стрелка вниз (лучше)
+                    arrowColor = positiveColor;
+                    indicatorClass = 'time-down';
+                } else if (actualValue > averageValue) {
+                    arrowChar = '▲'; // Стрелка вверх (хуже)
+                    arrowColor = warningColor;
+                    indicatorClass = 'time-up';
+                }
+                if (arrowChar) {
+                    const $indicator = $('<span></span>')
+                        .addClass('time-indicator') // Общий класс для всех индикаторов
+                        .addClass(indicatorClass)   // Класс для конкретного типа (вверх/вниз)
+                        .css('color', arrowColor)   // Задаем цвет стрелки
+                        .css({ // Дополнительные стили для отступа
+                            'display': 'inline-block', // Чтобы margin работал
+                            'margin-left': '5px',      // Отступ слева от числа
+                            'font-weight': 'bold'    // Сделать стрелку жирной (опционально)
+                        })
+                        .text(arrowChar);           // Устанавливаем символ стрелки
+                    actualTimeCell.append($indicator);
+                }
+            }
+        }
+    });
+}
 ```
